@@ -21,7 +21,7 @@ An Android app that reveals the hidden information inside a **PDF** or **image**
 3. Press ▶ Run (phone or emulator), or **Build → Build APK(s)**
 
 ## APK
-[APk]
+[APk](https://github.com/cchuang2009/FileSPY/blob/main/src/app/build/outputs/apk/debug/app-debug.apk)
 
 ## Notes
 - Requires Android 8.0+ (API 26)
