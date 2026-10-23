@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="accent">#00BCD4</color>
+    <color name="ic_launcher_background">#1B2A41</color>
+    <string name="app_name">File SPY</string>
+    <string name="choose">Choose PDF / Image</string>
+    <string name="copy">Copy report</string>
+    <string name="hint">Pick a file to reveal who made it, when, where and with what.</string>
+    <style name="Theme.FileSpy" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/accent</item>
+    </style>
+</resources>

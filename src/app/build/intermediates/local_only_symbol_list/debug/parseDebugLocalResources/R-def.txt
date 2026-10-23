@@ -1,0 +1,15 @@
+R_DEF: Internal format may change without notice
+local
+color accent
+color ic_launcher_background
+drawable ic_launcher_foreground
+id btnChoose
+id btnCopy
+id report
+layout activity_main
+mipmap ic_launcher
+string app_name
+string choose
+string copy
+string hint
+style Theme.FileSpy
