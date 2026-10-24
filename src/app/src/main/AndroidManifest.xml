@@ -4,8 +4,23 @@
     <!-- Only needed for reverse-geocoding GPS coordinates into an address -->
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+
+    <!-- ===== Needed to read the GPS (lat/lng) stored inside photos =====
+         Since Android 10, the system hides GPS EXIF data from apps unless
+         ACCESS_MEDIA_LOCATION is granted (and requested at runtime). -->
+    <uses-permission android:name="android.permission.ACCESS_MEDIA_LOCATION" />
+    <!-- Android 13+ -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <!-- Android 12 and below -->
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+
     <application
         android:allowBackup="true"
+        android:largeHeap="true"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"
         android:label="@string/app_name"
@@ -19,5 +34,9 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity
+            android:name=".PanoActivity"
+            android:screenOrientation="portrait"
+            android:exported="false" />
     </application>
 </manifest>

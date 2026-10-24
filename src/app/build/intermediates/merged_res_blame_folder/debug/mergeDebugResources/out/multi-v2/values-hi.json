@@ -1,7 +1,7 @@
 {
     "logs": [
         {
-            "outputFile": "com.filespy.app-mergeDebugResources-29:/values-hi/values-hi.xml",
+            "outputFile": "com.filespy.app-mergeDebugResources-34:/values-hi/values-hi.xml",
             "map": [
                 {
                     "source": "/home/cchuang/.gradle/caches/9.6.0/transforms/a1dd68d0db776fb1bc0aa945925f1dbc/transformed/material-1.12.0/res/values-hi/values-hi.xml",

@@ -5,8 +5,14 @@ color ic_launcher_background
 drawable ic_launcher_foreground
 id btnChoose
 id btnCopy
+id btnOpen
+id btnPano
+id btnStart
+id preview
 id report
+id status
 layout activity_main
+layout activity_pano
 mipmap ic_launcher
 string app_name
 string choose

@@ -1,7 +1,7 @@
 {
     "logs": [
         {
-            "outputFile": "com.filespy.app-mergeDebugResources-29:/values-my/values-my.xml",
+            "outputFile": "com.filespy.app-mergeDebugResources-34:/values-my/values-my.xml",
             "map": [
                 {
                     "source": "/home/cchuang/.gradle/caches/9.6.0/transforms/0e66b3b1b3ab8194d5ec1b56f326eb26/transformed/core-1.13.1/res/values-my/values-my.xml",

@@ -1,21 +1,29 @@
 package com.filespy.app
 
+import android.Manifest
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.content.ContentUris
 import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
 import android.location.Geocoder
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.DocumentsContract
+import android.provider.MediaStore
 import android.provider.OpenableColumns
 import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.exifinterface.media.ExifInterface
 import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import com.tom_roush.pdfbox.pdmodel.PDDocument
+import java.io.InputStream
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -29,6 +37,13 @@ class MainActivity : AppCompatActivity() {
         if (uri != null) analyze(uri)
     }
 
+    // Runtime permission request. We open the picker afterwards whether or not the
+    // user agreed; without ACCESS_MEDIA_LOCATION the report just explains why GPS is empty.
+    private val permissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+            launchPicker()
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -36,7 +51,12 @@ class MainActivity : AppCompatActivity() {
 
         reportView = findViewById(R.id.report)
         findViewById<Button>(R.id.btnChoose).setOnClickListener {
-            picker.launch(arrayOf("application/pdf", "image/*"))
+            val missing = missingPermissions()
+            if (missing.isEmpty()) launchPicker()
+            else permissionLauncher.launch(missing.toTypedArray())
+        }
+        findViewById<Button>(R.id.btnPano).setOnClickListener {
+            startActivity(Intent(this, PanoActivity::class.java))
         }
         findViewById<Button>(R.id.btnCopy).setOnClickListener {
             val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -44,6 +64,33 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, "Copied", Toast.LENGTH_SHORT).show()
         }
     }
+
+    private fun launchPicker() {
+        picker.launch(arrayOf("application/pdf", "image/*"))
+    }
+
+    // ---------------------------------------------------------------- permissions
+
+    /** Permissions we still need before photo GPS can be read (Android 10+ only). */
+    private fun missingPermissions(): List<String> {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return emptyList()
+        val wanted = mutableListOf(Manifest.permission.ACCESS_MEDIA_LOCATION)
+        wanted += if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
+            Manifest.permission.READ_MEDIA_IMAGES
+        else
+            Manifest.permission.READ_EXTERNAL_STORAGE
+        return wanted.filter {
+            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+        }
+    }
+
+    private fun hasMediaLocationPermission(): Boolean =
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.Q ||
+            ContextCompat.checkSelfPermission(
+                this, Manifest.permission.ACCESS_MEDIA_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+
+    // ---------------------------------------------------------------- analysis
 
     private fun analyze(uri: Uri) {
         reportView.text = "Analyzing…"
@@ -86,8 +133,44 @@ class MainActivity : AppCompatActivity() {
         return sb.toString()
     }
 
+    // ---------------------------------------------------------------- GPS-safe stream
+
+    /**
+     * Android 10+ strips GPS from EXIF when a photo is read through MediaStore.
+     * To get the untouched original we need BOTH:
+     *   1. the ACCESS_MEDIA_LOCATION permission, and
+     *   2. a MediaStore URI wrapped with MediaStore.setRequireOriginal().
+     * The document picker returns a "documents" URI, so we convert it first.
+     */
+    private fun openOriginalStream(uri: Uri): InputStream? {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && hasMediaLocationPermission()) {
+            toMediaStoreUri(uri)?.let { mediaUri ->
+                try {
+                    return contentResolver.openInputStream(MediaStore.setRequireOriginal(mediaUri))
+                } catch (e: Exception) {
+                    // fall through to the normal stream
+                }
+            }
+        }
+        return contentResolver.openInputStream(uri)
+    }
+
+    private fun toMediaStoreUri(uri: Uri): Uri? {
+        if (uri.authority == MediaStore.AUTHORITY) return uri // already a MediaStore URI
+        if (uri.authority == "com.android.providers.media.documents") {
+            // Document ID looks like "image:1234"
+            val id = DocumentsContract.getDocumentId(uri)
+                .substringAfter(':', "")
+                .toLongOrNull() ?: return null
+            return ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id)
+        }
+        return null
+    }
+
+    // ---------------------------------------------------------------- images
+
     private fun imageInfo(uri: Uri, sb: StringBuilder) {
-        contentResolver.openInputStream(uri)?.use { stream ->
+        openOriginalStream(uri)?.use { stream ->
             val exif = ExifInterface(stream)
             fun t(tag: String) = exif.getAttribute(tag)
 
@@ -108,13 +191,28 @@ class MainActivity : AppCompatActivity() {
             sb.section("WHERE")
             val ll = exif.latLong
             if (ll != null) {
-                sb.line("GPS", "%.6f, %.6f".format(ll[0], ll[1]))
+                sb.line("Latitude", "%.6f".format(Locale.US, ll[0]))
+                sb.line("Longitude", "%.6f".format(Locale.US, ll[1]))
                 val alt = exif.getAltitude(Double.NaN)
                 sb.line("Altitude", if (alt.isNaN()) null else "%.1f m".format(alt))
                 sb.line("Map", "https://maps.google.com/?q=${ll[0]},${ll[1]}")
                 sb.line("Address", reverseGeocode(ll[0], ll[1]))
             } else {
-                sb.line("GPS", "No location data in this image")
+                sb.line("GPS", "No location data readable")
+                if (!hasMediaLocationPermission()) {
+                    sb.line(
+                        "Why?",
+                        "Permission \"Access media location\" is not granted. " +
+                            "Open App info > Permissions > Photos and videos and allow it, " +
+                            "then pick the image again."
+                    )
+                } else {
+                    sb.line(
+                        "Why?",
+                        "The photo has no GPS tags, or it was stripped (camera location " +
+                            "was off, or the image was shared via a chat app / cloud service)."
+                    )
+                }
             }
 
             sb.section("IMAGE")
@@ -126,6 +224,8 @@ class MainActivity : AppCompatActivity() {
             sb.line("Flash", t(ExifInterface.TAG_FLASH))
         }
     }
+
+    // ---------------------------------------------------------------- PDFs
 
     private fun pdfInfo(uri: Uri, sb: StringBuilder) {
         contentResolver.openInputStream(uri)?.use { stream ->
